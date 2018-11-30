@@ -7,17 +7,27 @@ import * as vscode from 'vscode';
 import axios from 'axios';
 // import zlib = require('zlib');
 
-// interface StockRealTimeInfo {
-//     symbol:string
-//     timestamp:number
-
+// interface Record{
+//     price:number;
+//     amount:number;
 // }
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
+interface StockRealTimeInfo {
+    symbol:string;
+    timeStamp:number;
+    current:number;
+    // sellRecord:Record[];
+    // buyRecord:Record[];
+}
+function parseRealTimeInfo(response:any) {
+    let pankou:StockRealTimeInfo={
+        symbol:response["symbol"],
+        timeStamp:response["timestamp"],
+        current:response["current"],
+    };
+    return pankou;
+}
 export function activate(context: vscode.ExtensionContext) {
 
-    // Use the console to output diagnostic information (console.log) and errors (console.error)
-    // This line of code will only be executed once when your extension is activated
     console.log('Congratulations, your extension "stock" is now active!');
 
     const axiosInstance = axios.create({
@@ -28,28 +38,38 @@ export function activate(context: vscode.ExtensionContext) {
     },
     });
 
-
     let barItem=vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right,-100);
     barItem.text="XQ";
     barItem.command="extension.sayHello";
     barItem.show();
 
+    // let inputBox=vscode.window.createInputBox();
+    // inputBox.value="shuai";
+    // inputBox.show();
+
+
     let disposable = vscode.commands.registerCommand('extension.sayHello', () => {
 
-        axiosInstance.get('/v5/stock/realtime/pankou.json?symbol=SH603666')
-        .then(function (response) {
-            // handle success
-            let info=response.data;
-            console.log(info);
-            vscode.window.showInformationMessage(JSON.stringify(info));
-        })
-        .catch(function (error) {
-            // handle error
-            console.log(error.response);
+        let promiseArray:any[]=[]; 
+        promiseArray.push(axiosInstance.get('/v5/stock/realtime/pankou.json?symbol=SH603666'));
+        promiseArray.push(axiosInstance.get('/v5/stock/realtime/pankou.json?symbol=SZ002624'));
+
+        Promise.all(promiseArray).then(function(results) {
+            let panel=vscode.window.createWebviewPanel("shuai","pankou",vscode.ViewColumn.Active);
+
+            let html:string="";
+            for (let response of results) {
+                if (response.data["error_code"]===0){
+                    html+=JSON.stringify(parseRealTimeInfo(response.data["data"]));
+                } else{
+
+                }
+            }
+            panel.webview.html=html;
+            panel.reveal();
+
+        }).catch(function (error){
             vscode.window.showInformationMessage(JSON.stringify(error.response));
-        })
-        .then(function () {
-            // always executed
         });
 
     });
