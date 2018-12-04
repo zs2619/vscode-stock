@@ -1,11 +1,10 @@
 'use strict';
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
+
+import * as path from 'path';
+import * as fs from 'fs';
 import * as vscode from 'vscode';
-// import https = require('https');
-// import http = require('http')
 import axios from 'axios';
-// import zlib = require('zlib');
+
 
 // interface Record{
 //     price:number;
@@ -26,9 +25,44 @@ function parseRealTimeInfo(response:any) {
     };
     return pankou;
 }
+interface StockConfigFile{
+    stock:string[];
+    index:string[];
+    indexPollTime:number;
+    pankouPollTime:number;
+}
+const defaultStockConfigFile:StockConfigFile={stock:["SH603666", "SZ002624" ,"SZ002371"],index:["SZ399006"],indexPollTime:10,pankouPollTime:10};
+const defaultFileName='stock.json';
+let   FullPath:string ;
+
+let stockConfigFile:StockConfigFile;
+
+async function createDefaultConfig(currPath:string) {
+
+    const stockConfigFile = path.join(currPath, defaultFileName);
+
+    fs.writeFileSync(stockConfigFile,JSON.stringify(defaultStockConfigFile));
+    let document = await vscode.workspace.openTextDocument(stockConfigFile);
+    vscode.window.showTextDocument(document);
+}
+
+function loadConfig(currPath:string) {
+    const stockConfigFile = path.join(currPath, defaultFileName);
+
+    if (!fs.existsSync(stockConfigFile)) {
+        createDefaultConfig(currPath);
+    }
+    let cfgObj: StockConfigFile;
+    let buf=fs.readFileSync(stockConfigFile );
+    cfgObj= JSON.parse(buf.toString()) as StockConfigFile;
+    return cfgObj;
+}
+
+
 export function activate(context: vscode.ExtensionContext) {
 
     console.log('Congratulations, your extension "stock" is now active!');
+    FullPath= path.join(context.extensionPath, defaultFileName);
 
     const axiosInstance = axios.create({
     baseURL: 'https://stock.xueqiu.com',
@@ -38,6 +72,12 @@ export function activate(context: vscode.ExtensionContext) {
     },
     });
 
+    stockConfigFile= loadConfig(context.extensionPath);
+
+    setInterval(()=>{
+        vscode.window.setStatusBarMessage("shuai");
+    },10*1000);
+
     let barItem=vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right,-100);
     barItem.text="XQ";
     barItem.command="extension.sayHello";
@@ -46,15 +86,20 @@ export function activate(context: vscode.ExtensionContext) {
     // let inputBox=vscode.window.createInputBox();
     // inputBox.value="shuai";
     // inputBox.show();
-
+    vscode.workspace.onDidSaveTextDocument((event)=>{
+        if (event.fileName===FullPath){
+            stockConfigFile= loadConfig(context.extensionPath);
+        }
+    });
 
     let disposable = vscode.commands.registerCommand('extension.sayHello', () => {
 
         let promiseArray:any[]=[]; 
-        promiseArray.push(axiosInstance.get('/v5/stock/realtime/pankou.json?symbol=SH603666'));
-        promiseArray.push(axiosInstance.get('/v5/stock/realtime/pankou.json?symbol=SZ002624'));
-
-        Promise.all(promiseArray).then(function(results) {
+        for ( let s of stockConfigFile.stock) {
+			const url = `/v5/stock/realtime/pankou.json?symbol=${s}`;
+            promiseArray.push(axiosInstance.get(url));
+        }
+            Promise.all(promiseArray).then(function(results) {
             let panel=vscode.window.createWebviewPanel("shuai","pankou",vscode.ViewColumn.Active);
 
             let html:string="";
