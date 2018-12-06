@@ -1,9 +1,8 @@
 'use strict';
 
-import * as path from 'path';
-import * as fs from 'fs';
 import * as vscode from 'vscode';
 import axios from 'axios';
+import { isNumber } from 'util';
 
 
 // interface Record{
@@ -17,6 +16,7 @@ interface StockRealTimeInfo {
     // sellRecord:Record[];
     // buyRecord:Record[];
 }
+
 function parseRealTimeInfo(response:any) {
     let pankou:StockRealTimeInfo={
         symbol:response["symbol"],
@@ -25,81 +25,52 @@ function parseRealTimeInfo(response:any) {
     };
     return pankou;
 }
-interface StockConfigFile{
-    stock:string[];
-    index:string[];
-    indexPollTime:number;
-    pankouPollTime:number;
-}
-const defaultStockConfigFile:StockConfigFile={stock:["SH603666", "SZ002624" ,"SZ002371"],index:["SZ399006"],indexPollTime:10,pankouPollTime:10};
-const defaultFileName='stock.json';
-let   FullPath:string ;
 
-let stockConfigFile:StockConfigFile;
-
-async function createDefaultConfig(currPath:string) {
-
-    const stockConfigFile = path.join(currPath, defaultFileName);
-
-    fs.writeFileSync(stockConfigFile,JSON.stringify(defaultStockConfigFile));
-    let document = await vscode.workspace.openTextDocument(stockConfigFile);
-    vscode.window.showTextDocument(document);
+interface IndexInfo{
+    symbol:number;
+    current:number;
+    percent:number;
 }
 
-function loadConfig(currPath:string) {
-    const stockConfigFile = path.join(currPath, defaultFileName);
+class Stock {
 
-    if (!fs.existsSync(stockConfigFile)) {
-        createDefaultConfig(currPath);
+    private inst:any;
+    private barItemArray:vscode.StatusBarItem[]=[];
+
+    constructor( ) {
+        this.inst= axios.create({
+            baseURL: 'https://stock.xueqiu.com',
+            timeout: 5000,
+            headers:{'Connection': 'keep-alive',
+                    'Accept-Encoding': 'gzip, deflate, br',
+            },
+        });
     }
-    let cfgObj: StockConfigFile;
-    let buf=fs.readFileSync(stockConfigFile );
-    cfgObj= JSON.parse(buf.toString()) as StockConfigFile;
-    return cfgObj;
-}
 
+    public createStatusBarItem(item:IndexInfo) {
+        const message = `「${item.symbol}」${item.current} ${item.percent}%`;
+        const barItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
+        barItem.text = message;
+        barItem.show();
+        return barItem;
+    }
+    public updateStocksPankouInfo():void{
 
-export function activate(context: vscode.ExtensionContext) {
+        const config = vscode.workspace.getConfiguration();
+        const stocks = config.get<string[]>('stock.stocks');
 
-    console.log('Congratulations, your extension "stock" is now active!');
-    FullPath= path.join(context.extensionPath, defaultFileName);
-
-    const axiosInstance = axios.create({
-    baseURL: 'https://stock.xueqiu.com',
-    timeout: 5000,
-    headers:{'Connection': 'keep-alive',
-            'Accept-Encoding': 'gzip, deflate, br',
-    },
-    });
-
-    stockConfigFile= loadConfig(context.extensionPath);
-
-    setInterval(()=>{
-        vscode.window.setStatusBarMessage("shuai");
-    },10*1000);
-
-    let barItem=vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right,-100);
-    barItem.text="XQ";
-    barItem.command="extension.sayHello";
-    barItem.show();
-
-    // let inputBox=vscode.window.createInputBox();
-    // inputBox.value="shuai";
-    // inputBox.show();
-    vscode.workspace.onDidSaveTextDocument((event)=>{
-        if (event.fileName===FullPath){
-            stockConfigFile= loadConfig(context.extensionPath);
+        if (!Array.isArray(stocks)) {
+            vscode.window.showInformationMessage('config setting stocks error');
+            return ;
         }
-    });
-
-    let disposable = vscode.commands.registerCommand('extension.sayHello', () => {
 
         let promiseArray:any[]=[]; 
-        for ( let s of stockConfigFile.stock) {
+        for ( let s of stocks) {
 			const url = `/v5/stock/realtime/pankou.json?symbol=${s}`;
-            promiseArray.push(axiosInstance.get(url));
+            promiseArray.push(this.inst.get(url));
         }
-            Promise.all(promiseArray).then(function(results) {
+
+        Promise.all(promiseArray).then(function(results) {
             let panel=vscode.window.createWebviewPanel("shuai","pankou",vscode.ViewColumn.Active);
 
             let html:string="";
@@ -112,14 +83,74 @@ export function activate(context: vscode.ExtensionContext) {
             }
             panel.webview.html=html;
             panel.reveal();
+        }).catch(function (error){
+            vscode.window.showInformationMessage(JSON.stringify(error.response));
+        });
+    }
+
+    public updateIndexInfo():void{
+        const config = vscode.workspace.getConfiguration();
+        const indexs = config.get<string[]>('stock.indexs');
+
+        if (!Array.isArray(indexs)) {
+            vscode.window.showInformationMessage('config setting stocks error');
+            return ;
+        }
+
+        let promiseArray:any[]=[]; 
+        for ( let s of indexs) {
+			const url = `/v5/stock/realtime/quotec.json?symbol=${s}`;
+            promiseArray.push(this.inst.get(url));
+        }
+
+        Promise.all(promiseArray).then((results)=> {
+            for (let bar of this.barItemArray){
+                bar.dispose();
+            }
+
+            for (let response of results) {
+                if (response.data["error_code"]===0){
+                    let respInfo= response.data["data"][0];
+                    const item:IndexInfo={
+                            symbol:respInfo["symbol"],
+                            current:respInfo["current"],
+                            percent:respInfo["percent"],
+                    }
+                   this.barItemArray.push( this.createStatusBarItem(item));
+                }
+            }
 
         }).catch(function (error){
             vscode.window.showInformationMessage(JSON.stringify(error.response));
         });
+    }
+}
 
+
+
+export function activate(context: vscode.ExtensionContext) {
+
+    let stock = new Stock();
+
+    const config = vscode.workspace.getConfiguration();
+    const pollTime = config.get<number>('stock.indexPollTime');
+    if (isNumber(pollTime)){
+        setInterval(()=>{
+            stock.updateIndexInfo();
+        },pollTime*1000);
+    }
+
+    let barItem=vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right,-100);
+    barItem.text="XQ";
+    barItem.command="extension.createWebview";
+    barItem.show();
+
+    let disposable = vscode.commands.registerCommand('extension.createWebview', () => {
+        stock.updateStocksPankouInfo();
     });
 
     context.subscriptions.push(disposable);
+    context.subscriptions.push(barItem);
 }
 
 // this method is called when your extension is deactivated
