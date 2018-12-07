@@ -42,7 +42,8 @@ class Stock {
 
     private inst:any;
     private barItemArray:Map<number,vscode.StatusBarItem>=new Map<number,vscode.StatusBarItem>();
-    
+    private webviewPanel:vscode.WebviewPanel|null=null;
+    private pankouPollTime:NodeJS.Timer|null=null;
 
     constructor( ) {
         this.inst= axios.create({
@@ -83,8 +84,24 @@ class Stock {
             promiseArray.push(this.inst.get(url));
         }
 
-        Promise.all(promiseArray).then(function(results) {
-            let panel=vscode.window.createWebviewPanel("shuai","quotec",vscode.ViewColumn.Active);
+        Promise.all(promiseArray).then((results)=>{
+            if (this.webviewPanel===null)
+            {
+                this.webviewPanel=vscode.window.createWebviewPanel("shuai","quotec",vscode.ViewColumn.Active);
+                this.webviewPanel.onDidDispose((event)=>{
+                    this.webviewPanel=null;
+                    if (this.pankouPollTime!==null){
+                        clearInterval(this.pankouPollTime);
+                    }
+                });
+
+                const pollTime = config.get<number>('stock.pankouPollTime');
+                if (isNumber(pollTime)){
+                    this.pankouPollTime=setInterval(()=>{
+                        this.updateStocksPankouInfo();
+                    },pollTime*1000);
+                }
+            }
 
             let html:string="";
             for (let response of results) {
@@ -94,8 +111,8 @@ class Stock {
 
                 }
             }
-            panel.webview.html=html;
-            panel.reveal();
+            this.webviewPanel.webview.html=html;
+            this.webviewPanel.reveal();
         }).catch(function (error){
             vscode.window.showInformationMessage(JSON.stringify(error.response));
         });

@@ -2,7 +2,7 @@
     "name": "stock",
     "displayName": "stock",
     "description": "stock",
-    "version": "0.0.4",
+    "version": "0.0.6",
     "publisher":"shuai",
     "engines": {
         "vscode": "^1.29.0"
