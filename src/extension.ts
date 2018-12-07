@@ -2,40 +2,47 @@
 
 import * as vscode from 'vscode';
 import axios from 'axios';
-import { isNumber } from 'util';
+import { isNumber, isUndefined } from 'util';
 
 
 // interface Record{
 //     price:number;
 //     amount:number;
 // }
-interface StockRealTimeInfo {
-    symbol:string;
-    timeStamp:number;
-    current:number;
-    // sellRecord:Record[];
-    // buyRecord:Record[];
-}
+// interface StockRealTimeInfo {
+//     symbol:string;
+//     timeStamp:number;
+//     current:number;
+//     // sellRecord:Record[];
+//     // buyRecord:Record[];
+// }
 
-function parseRealTimeInfo(response:any) {
-    let pankou:StockRealTimeInfo={
-        symbol:response["symbol"],
-        timeStamp:response["timestamp"],
-        current:response["current"],
-    };
-    return pankou;
-}
 
-interface IndexInfo{
+interface QuoteInfo{
     symbol:number;
     current:number;
     percent:number;
+    avg_price:number;
+    high:number;
+    low:number;
+}
+function parseRealTimeInfo(response:any) {
+    let quote:QuoteInfo={
+        symbol:response["symbol"],
+        current:response["current"],
+        percent:response["percent"],
+        avg_price:response["avg_price"],
+        high:response["high"],
+        low:response["low"],
+    };
+    return quote;
 }
 
 class Stock {
 
     private inst:any;
-    private barItemArray:vscode.StatusBarItem[]=[];
+    private barItemArray:Map<number,vscode.StatusBarItem>=new Map<number,vscode.StatusBarItem>();
+    
 
     constructor( ) {
         this.inst= axios.create({
@@ -47,12 +54,18 @@ class Stock {
         });
     }
 
-    public createStatusBarItem(item:IndexInfo) {
+    public updateStatusBarItem(item:QuoteInfo) {
         const message = `「${item.symbol}」${item.current} ${item.percent}%`;
-        const barItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
-        barItem.text = message;
-        barItem.show();
-        return barItem;
+        let barItem= this.barItemArray.get(item.symbol);
+        if (isUndefined(barItem)){
+            const newBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
+            newBarItem.text = message;
+            this.barItemArray.set(item.symbol,newBarItem);
+            newBarItem.show();
+        } else {
+            barItem.text = message;
+            barItem.show();
+        }
     }
     public updateStocksPankouInfo():void{
 
@@ -66,17 +79,17 @@ class Stock {
 
         let promiseArray:any[]=[]; 
         for ( let s of stocks) {
-			const url = `/v5/stock/realtime/pankou.json?symbol=${s}`;
+			const url = `/v5/stock/realtime/quotec.json?symbol=${s}`;
             promiseArray.push(this.inst.get(url));
         }
 
         Promise.all(promiseArray).then(function(results) {
-            let panel=vscode.window.createWebviewPanel("shuai","pankou",vscode.ViewColumn.Active);
+            let panel=vscode.window.createWebviewPanel("shuai","quotec",vscode.ViewColumn.Active);
 
             let html:string="";
             for (let response of results) {
                 if (response.data["error_code"]===0){
-                    html+=JSON.stringify(parseRealTimeInfo(response.data["data"]));
+                    html+=JSON.stringify(parseRealTimeInfo(response.data["data"][0]));
                 } else{
 
                 }
@@ -104,19 +117,11 @@ class Stock {
         }
 
         Promise.all(promiseArray).then((results)=> {
-            for (let bar of this.barItemArray){
-                bar.dispose();
-            }
-
             for (let response of results) {
                 if (response.data["error_code"]===0){
                     let respInfo= response.data["data"][0];
-                    const item:IndexInfo={
-                            symbol:respInfo["symbol"],
-                            current:respInfo["current"],
-                            percent:respInfo["percent"],
-                    }
-                   this.barItemArray.push( this.createStatusBarItem(item));
+                    const item:QuoteInfo= parseRealTimeInfo(respInfo);
+                    this.updateStatusBarItem(item);
                 }
             }
 
@@ -125,8 +130,6 @@ class Stock {
         });
     }
 }
-
-
 
 export function activate(context: vscode.ExtensionContext) {
 
