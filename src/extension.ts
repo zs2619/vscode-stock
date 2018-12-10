@@ -117,8 +117,25 @@ class Stock {
             vscode.window.showInformationMessage(JSON.stringify(error.response));
         });
     }
+    public checkStockTime():boolean{
+        const nowDate=new Date();
+        if (0<nowDate.getDay()&&nowDate.getDay()<6){
+            if( 9<nowDate.getHours()&&nowDate.getHours()<16) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     public updateIndexInfo():void{
+        if (!this.checkStockTime()){
+            this.barItemArray.forEach((val,key,map)=>{
+                val.dispose();
+                map.delete(key);
+            });
+            return;
+        }
+
         const config = vscode.workspace.getConfiguration();
         const indexs = config.get<string[]>('stock.indexs');
 
