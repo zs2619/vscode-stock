@@ -102,17 +102,13 @@ class Stock {
                     },pollTime*1000);
                 }
             }
-
-            let html:string="";
+            let quoteInfos:QuoteInfo[]=[];
             for (let response of results) {
                 if (response.data["error_code"]===0){
-                    html+=JSON.stringify(parseRealTimeInfo(response.data["data"][0]));
+                    quoteInfos.push(parseRealTimeInfo(response.data["data"][0]));
                 } else{
-
                 }
             }
-            this.webviewPanel.webview.html=html;
-            this.webviewPanel.reveal();
         }).catch(function (error){
             vscode.window.showInformationMessage(JSON.stringify(error.response));
         });
@@ -120,7 +116,7 @@ class Stock {
     public checkStockTime():boolean{
         const nowDate=new Date();
         if (0<nowDate.getDay()&&nowDate.getDay()<6){
-            if( 9<nowDate.getHours()&&nowDate.getHours()<16) {
+            if( 9<=nowDate.getHours()&&nowDate.getHours()<=16) {
                 return true;
             }
         }
@@ -162,6 +158,18 @@ class Stock {
         }).catch(function (error){
             vscode.window.showInformationMessage(JSON.stringify(error.response));
         });
+    }
+    public formatStockInfo(infos:QuoteInfo[]){
+        if (this.webviewPanel===null){
+            return ;
+        }
+
+        let html:string="";
+        for (let quote of infos) {
+            html+=JSON.stringify(quote);
+        }
+        this.webviewPanel.webview.html=html;
+        this.webviewPanel.reveal();
     }
 }
 
