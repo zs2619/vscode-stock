@@ -116,7 +116,7 @@ class Stock {
     public checkStockTime():boolean{
         const nowDate=new Date();
         if (0<nowDate.getDay()&&nowDate.getDay()<6){
-            if( 9<=nowDate.getHours()&&nowDate.getHours()<=16) {
+            if( 9<=nowDate.getHours()&&nowDate.getHours()<16) {
                 return true;
             }
         }
