@@ -2,8 +2,8 @@
     "name": "stock",
     "displayName": "stock",
     "description": "stock",
-    "version": "0.0.8",
-    "publisher":"shuai",
+    "version": "0.0.9",
+    "publisher": "shuai",
     "engines": {
         "vscode": "^1.29.0"
     },
@@ -14,39 +14,39 @@
         "*"
     ],
     "main": "./out/extension",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/zs2619/vscode-stock.git"
-	},
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/zs2619/vscode-stock.git"
+    },
     "contributes": {
-		"configuration": {
-			"properties": {
-				"stock.stocks": {
-					"type": "array",
-					"default": [
+        "configuration": {
+            "properties": {
+                "stock.stocks": {
+                    "type": "array",
+                    "default": [
                         "SZ000001"
-					],
-					"description": "config stock code"
-				},
-				"stock.indexs": {
-					"type": "array",
-					"default": [
+                    ],
+                    "description": "config stock code"
+                },
+                "stock.indexs": {
+                    "type": "array",
+                    "default": [
                         "SZ399006"
-					],
-					"description": "config stock code"
-				},
-				"stock.indexPollTime": {
-					"type": "number",
-					"default": 10,
-					"description": "poll time"
-				},
-				"stock.pankouPollTime": {
-					"type": "number",
-					"default": 10,
-					"description": "pankou poll time"
-				}
-			}
-		},
+                    ],
+                    "description": "config stock code"
+                },
+                "stock.indexPollTime": {
+                    "type": "number",
+                    "default": 10,
+                    "description": "poll time"
+                },
+                "stock.pankouPollTime": {
+                    "type": "number",
+                    "default": 10,
+                    "description": "pankou poll time"
+                }
+            }
+        },
         "commands": [
             {
                 "command": "extension.sayHello",

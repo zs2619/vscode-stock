@@ -19,7 +19,7 @@ import { isNumber, isUndefined } from 'util';
 
 
 interface QuoteInfo{
-    symbol:number;
+    symbol:string;
     current:number;
     percent:number;
     avg_price:number;
@@ -41,7 +41,7 @@ function parseRealTimeInfo(response:any) {
 class Stock {
 
     private inst:any;
-    private barItemArray:Map<number,vscode.StatusBarItem>=new Map<number,vscode.StatusBarItem>();
+    private barItemArray:Map<string,vscode.StatusBarItem>=new Map<string,vscode.StatusBarItem>();
     private webviewPanel:vscode.WebviewPanel|null=null;
     private pankouPollTime:NodeJS.Timer|null=null;
 
@@ -124,13 +124,16 @@ class Stock {
     }
 
     public updateIndexInfo():void{
-        if (!this.checkStockTime()){
-            this.barItemArray.forEach((val,key,map)=>{
-                val.dispose();
-                map.delete(key);
-            });
-            return;
-        }
+
+
+        // if (!this.checkStockTime()){
+        //     this.barItemArray.forEach((val,key,map)=>{
+        //         val.dispose();
+        //         map.delete(key);
+        //     });
+        //     return;
+        // }
+
 
         const config = vscode.workspace.getConfiguration();
         const indexs = config.get<string[]>('stock.indexs');
@@ -145,6 +148,16 @@ class Stock {
 			const url = `/v5/stock/realtime/quotec.json?symbol=${s}`;
             promiseArray.push(this.inst.get(url));
         }
+
+        this.barItemArray.forEach((val,key,map)=>{
+            for ( let s of indexs) {
+                if (s===key){
+                    return;
+                }
+            }
+            val.dispose();
+            map.delete(key);
+        });
 
         Promise.all(promiseArray).then((results)=> {
             for (let response of results) {
